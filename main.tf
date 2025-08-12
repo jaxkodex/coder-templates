@@ -19,6 +19,16 @@ variable "docker_socket" {
   type        = string
 }
 
+variable "github_repo" {
+  description = "GitHub repository URL (e.g., https://github.com/user/repo or user/repo)"
+  type        = string
+  default     = ""
+  validation {
+    condition = can(regex("^(https://github.com/)?[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/?$", var.github_repo)) || var.github_repo == ""
+    error_message = "GitHub repository must be in format 'user/repo' or 'https://github.com/user/repo', or empty string for no repo."
+  }
+}
+
 provider "docker" {
   # Defaulting to null if the variable is an empty string lets us have an optional variable without having to set our own default
   host = var.docker_socket != "" ? var.docker_socket : null
@@ -39,6 +49,13 @@ resource "coder_agent" "main" {
       cp -rT /etc/skel ~
       touch ~/.init_done
     fi
+
+    # Clone GitHub repository if specified
+    ${var.github_repo != "" ? "cd /home/coder" : ""}
+    ${var.github_repo != "" ? format("if [ ! -d \"%s\" ]; then", basename(replace(var.github_repo, "/\\.git$/", ""))) : ""}
+    ${var.github_repo != "" ? format("  echo 'Cloning repository: %s'", var.github_repo) : ""}
+    ${var.github_repo != "" ? format("  git clone %s || echo 'Failed to clone repository, continuing...'", startswith(var.github_repo, "https://") ? var.github_repo : "https://github.com/${var.github_repo}") : ""}
+    ${var.github_repo != "" ? "fi" : ""}
 
     # Add any commands that should be executed at workspace startup (e.g install requirements, start a program, etc) here
   EOT
@@ -119,6 +136,16 @@ resource "coder_agent" "main" {
     interval     = 10
     timeout      = 1
   }
+
+  metadata {
+    display_name = "Repository"
+    key          = "8_repository"
+    script        = <<EOT
+      var.github_repo != "" ? var.github_repo : "No repository specified"
+    EOT
+    interval     = 0
+    timeout      = 1
+  }
 }
 
 # See https://registry.coder.com/modules/coder/code-server
@@ -143,7 +170,7 @@ module "jetbrains_gateway" {
   default        = "IU"
 
   # Default folder to open when starting a JetBrains IDE
-  folder = "/home/coder"
+  folder = var.github_repo != "" ? "/home/coder/${basename(replace(var.github_repo, "/\\.git$/", ""))}" : "/home/coder"
 
   # This ensures that the latest non-breaking version of the module gets downloaded, you can also pin the module version to prevent breaking changes in production.
   version = "~> 1.0"
