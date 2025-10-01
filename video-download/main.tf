@@ -3,12 +3,17 @@ terraform {
     coder = {
       source = "coder/coder"
     }
+    docker = {
+      source = "kreuzwerker/docker"
+    }
   }
 }
 
 data "coder_provisioner" "me" {}
 
 data "coder_workspace" "me" {}
+
+data "coder_workspace_owner" "me" {}
 
 resource "coder_agent" "main" {
   arch = data.coder_provisioner.me.arch
@@ -59,8 +64,35 @@ resource "coder_script" "startup_script" {
   script             = <<-EOF
     #!/bin/sh
     set -e
-    # Run programs at workspace startup
+
+    # Clone or refresh youtube-dl repository
+    if [ -d "$HOME/youtube-dl" ]; then
+      echo "Refreshing youtube-dl repository..."
+      cd "$HOME/youtube-dl" && git pull || true
+    else
+      echo "Cloning youtube-dl repository..."
+      git clone https://github.com/ytdl-org/youtube-dl.git "$HOME/youtube-dl" || true
+    fi
   EOF
   run_on_start       = true
   start_blocks_login = true
+}
+
+resource "docker_container" "workspace" {
+  count = data.coder_workspace.me.start_count
+  image = "jaxkodex/coder-images:ffmpeg-01102025-1"
+  name  = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+
+  hostname = data.coder_workspace.me.name
+
+  env = [
+    "CODER_AGENT_TOKEN=${coder_agent.main.token}",
+  ]
+
+  command = ["sh", "-c", coder_agent.main.init_script]
+
+  host {
+    host = "host.docker.internal"
+    ip   = "host-gateway"
+  }
 }
