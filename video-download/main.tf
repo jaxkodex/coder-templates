@@ -15,6 +15,15 @@ data "coder_workspace" "me" {}
 
 data "coder_workspace_owner" "me" {}
 
+data "coder_parameter" "volume_host_path" {
+  name         = "volume_host_path"
+  display_name = "Volume Host Path"
+  description  = "The host path to mount as /videos in the workspace"
+  type         = "string"
+  default      = "/mnt/videos"
+  mutable      = false
+}
+
 resource "coder_agent" "main" {
   arch = data.coder_provisioner.me.arch
   os   = data.coder_provisioner.me.os
@@ -94,5 +103,10 @@ resource "docker_container" "workspace" {
   host {
     host = "host.docker.internal"
     ip   = "host-gateway"
+  }
+
+  volumes {
+    host_path      = data.coder_parameter.volume_host_path.value
+    container_path = "/videos"
   }
 }
