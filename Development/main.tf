@@ -25,12 +25,6 @@ data "coder_workspace" "me" {}
 
 data "coder_workspace_owner" "me" {}
 
-# GitHub authentication - requires Coder deployment to have GitHub OAuth configured
-# See: https://coder.com/docs/admin/external-auth
-data "coder_external_auth" "github" {
-  id = "github"
-}
-
 resource "coder_agent" "main" {
   arch = data.coder_provisioner.me.arch
   os   = "linux"
@@ -60,13 +54,6 @@ resource "coder_env" "welcome_message" {
   value    = "Welcome to your Coder workspace!"
 }
 
-# Inject GitHub token as environment variable
-resource "coder_env" "github_token" {
-  agent_id = coder_agent.main.id
-  name     = "GITHUB_TOKEN"
-  value    = data.coder_external_auth.github.access_token
-}
-
 # Adds code-server
 # See all available modules at https://registry.coder.com/modules
 module "code-server" {
@@ -85,26 +72,9 @@ resource "coder_script" "startup_script" {
   agent_id           = coder_agent.main.id
   display_name       = "Startup Script"
   script             = <<-EOF
-    #!/bin/bash
+    #!/bin/sh
     set -e
-
-    # Configure Git to use GitHub token for authentication
-    if [ -n "$GITHUB_TOKEN" ]; then
-      echo "Configuring Git with GitHub credentials..."
-      git config --global credential.helper store
-      echo "https://${data.coder_external_auth.github.access_token}@github.com" > ~/.git-credentials
-      chmod 600 ~/.git-credentials
-
-      # Set Git user info from Coder workspace owner
-      git config --global user.name "${data.coder_workspace_owner.me.full_name != "" ? data.coder_workspace_owner.me.full_name : data.coder_workspace_owner.me.name}"
-      git config --global user.email "${data.coder_workspace_owner.me.email}"
-
-      echo "Git configured successfully with GitHub authentication"
-    else
-      echo "Warning: GITHUB_TOKEN not available. GitHub authentication not configured."
-    fi
-
-    # Run additional programs at workspace startup
+    # Run programs at workspace startup
   EOF
   run_on_start       = true
   start_blocks_login = true
