@@ -82,11 +82,10 @@ resource "coder_script" "startup_script" {
 
 # Build Docker image from Dockerfile
 resource "docker_image" "coder_image" {
-  name = "coder-${data.coder_workspace.me.id}"
+  name = "coder-${data.coder_workspace.me.id}:latest"
   build {
-    context    = "${path.module}"
-    dockerfile = "Dockerfile"
-    tag        = ["coder-${data.coder_workspace.me.id}:latest"]
+    context = path.module
+    build_args = {}
   }
   triggers = {
     dockerfile_hash = filemd5("${path.module}/Dockerfile")

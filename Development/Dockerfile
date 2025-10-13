@@ -29,7 +29,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
 # Install pnpm
 RUN npm install -g pnpm
 
-# Install Python and pip (required for AWS SAM CLI)
+# Install Python and unzip (required for AWS CLI/SAM CLI)
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
     python3 \
@@ -39,10 +39,19 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Claude CLI
-RUN npm install -g @anthropic-ai/claude-cli
+RUN npm install -g @anthropic-ai/claude-code
 
-# Install AWS SAM CLI
-RUN pip3 install --no-cache-dir aws-sam-cli
+# Install AWS CLI (prerequisite for SAM CLI)
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf aws awscliv2.zip
+
+# Install AWS SAM CLI (official method)
+RUN curl -L "https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip" -o "aws-sam-cli.zip" && \
+    unzip aws-sam-cli.zip -d sam-installation && \
+    ./sam-installation/install && \
+    rm -rf sam-installation aws-sam-cli.zip
 
 # Install Go (latest stable version)
 RUN wget https://go.dev/dl/go1.23.5.linux-amd64.tar.gz && \
